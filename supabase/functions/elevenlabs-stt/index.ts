@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     apiFormData.append("tag_audio_events", "true");
 
     const keyterms = JSON.stringify([
-      "ignore previous instructions",
+      "ignore previous",
       "you are now",
       "DAN mode",
       "bypass safety",
