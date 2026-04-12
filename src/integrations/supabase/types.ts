@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attack_history: {
+        Row: {
+          agent_response: string | null
+          attack_label: string | null
+          audio_file_url: string | null
+          category: string
+          confidence: number
+          created_at: string
+          explanation: string | null
+          id: string
+          result: string
+          timestamp: string
+          transcript: string
+          use_case: string | null
+        }
+        Insert: {
+          agent_response?: string | null
+          attack_label?: string | null
+          audio_file_url?: string | null
+          category?: string
+          confidence?: number
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          result?: string
+          timestamp: string
+          transcript: string
+          use_case?: string | null
+        }
+        Update: {
+          agent_response?: string | null
+          attack_label?: string | null
+          audio_file_url?: string | null
+          category?: string
+          confidence?: number
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          result?: string
+          timestamp?: string
+          transcript?: string
+          use_case?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
