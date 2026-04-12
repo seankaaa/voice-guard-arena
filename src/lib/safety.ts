@@ -193,7 +193,14 @@ const KEYWORD_DATABASE: Record<string, KeywordRule> = {
 function normalizeTranscript(transcript: string) {
   return transcript
     .toLowerCase()
-    .replace(/[^a-z0-9\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeForKeywords(transcript: string) {
+  return transcript
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'\u0400-\u04FF\u0600-\u06FF\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
