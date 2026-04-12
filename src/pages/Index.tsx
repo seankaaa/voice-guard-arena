@@ -1,5 +1,7 @@
 import { useState, useCallback } from "react";
 import { Shield } from "lucide-react";
+import { toast } from "sonner";
+import { scanKeywords, classifyWithLLM, combineResults } from "@/lib/safety";
 import { MicButton } from "@/components/arena/MicButton";
 import { TranscriptCard } from "@/components/arena/TranscriptCard";
 import { ThreatAssessment } from "@/components/arena/ThreatAssessment";
@@ -31,15 +33,115 @@ const Index = () => {
   const [elevenLabsKey, setElevenLabsKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
 
-  const handleMicTranscript = useCallback((text: string) => {
-    setTranscript(text);
-    // For now, real mic transcripts don't run classification — just show the text
-    setResult(null);
-    setAttackLabel(null);
-    setConfidence(null);
-    setExplanation(null);
-    setAgentResponse(null);
-  }, []);
+  const handleMicTranscript = useCallback(
+    async (text: string) => {
+      setTranscript(text);
+
+      // 1) Instant keyword scan
+      const keywordResult = scanKeywords(text);
+
+      // 2) LLM classification (if Anthropic key is available)
+      if (anthropicKey) {
+        try {
+          const llmResult = await classifyWithLLM(text, anthropicKey);
+          const combined = combineResults(keywordResult, llmResult);
+
+          const categoryMap: Record<string, import("@/data/mockData").AttackCategory> = {
+            jailbreak: "Jailbreak",
+            coded_language: "Coded Language",
+            scam_vishing: "Scam/Vishing",
+            authority_spoof: "Authority Spoof",
+            safe: "Safe",
+          };
+
+          const category = categoryMap[combined.category] || "Safe";
+          const attackLabel = combined.subtype === "none"
+            ? "No Threat Detected"
+            : `${category} — ${combined.subtype}`;
+
+          setResult(combined.status);
+          setAttackLabel(attackLabel);
+          setConfidence(combined.confidence);
+          setExplanation(combined.explanation);
+          setAgentResponse(
+            combined.status === "SAFE"
+              ? "Request appears safe. Processing normally."
+              : combined.status === "WARNING"
+              ? "Potential risk detected. Proceeding with caution."
+              : "This request has been blocked by safety guardrails."
+          );
+
+          const now = new Date();
+          const ts = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+
+          const entry: AttackEntry = {
+            id: makeId(),
+            timestamp: ts,
+            transcript: text,
+            category,
+            result: combined.status,
+            confidence: combined.confidence,
+            agentResponse:
+              combined.status === "SAFE"
+                ? "Request appears safe. Processing normally."
+                : combined.status === "WARNING"
+                ? "Potential risk detected. Proceeding with caution."
+                : "This request has been blocked by safety guardrails.",
+            explanation: combined.explanation,
+            attackLabel,
+          };
+
+          setHistory((prev) => [entry, ...prev]);
+        } catch (err: any) {
+          console.error("LLM classification error:", err);
+          toast.error("Safety classification failed: " + (err.message || "Unknown error"));
+
+          // Fall back to keyword-only results
+          if (keywordResult.matched) {
+            const categoryMap: Record<string, import("@/data/mockData").AttackCategory> = {
+              jailbreak: "Jailbreak",
+              coded_language: "Coded Language",
+              scam_vishing: "Scam/Vishing",
+              authority_spoof: "Authority Spoof",
+            };
+            setResult("WARNING");
+            setAttackLabel(categoryMap[keywordResult.category!] || "Unknown");
+            setConfidence(0.5);
+            setExplanation("Keyword match: " + keywordResult.terms.join(", "));
+            setAgentResponse("Potential risk detected via keyword scan.");
+          } else {
+            setResult("SAFE");
+            setAttackLabel("No Threat Detected");
+            setConfidence(1);
+            setExplanation("No threats detected (LLM unavailable)");
+            setAgentResponse("Request appears safe. Processing normally.");
+          }
+        }
+      } else {
+        // No Anthropic key — keyword-only fallback
+        if (keywordResult.matched) {
+          const categoryMap: Record<string, import("@/data/mockData").AttackCategory> = {
+            jailbreak: "Jailbreak",
+            coded_language: "Coded Language",
+            scam_vishing: "Scam/Vishing",
+            authority_spoof: "Authority Spoof",
+          };
+          setResult("WARNING");
+          setAttackLabel(categoryMap[keywordResult.category!] || "Unknown");
+          setConfidence(0.5);
+          setExplanation("Keyword match (no LLM key): " + keywordResult.terms.join(", "));
+          setAgentResponse("Potential risk detected via keyword scan.");
+        } else {
+          setResult("SAFE");
+          setAttackLabel("No Threat Detected");
+          setConfidence(1);
+          setExplanation("No keyword threats detected. Add Anthropic key for deeper analysis.");
+          setAgentResponse("Request appears safe.");
+        }
+      }
+    },
+    [anthropicKey]
+  );
 
   const handleRunTest = useCallback((presetIndex: number) => {
     const preset = PRESET_ATTACKS[presetIndex];
