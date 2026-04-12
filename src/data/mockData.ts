@@ -11,6 +11,8 @@ export interface AttackEntry {
   agentResponse: string;
   explanation: string;
   attackLabel: string;
+  audioFileUrl?: string;
+  useCase?: string;
 }
 
 export interface PresetAttack {
