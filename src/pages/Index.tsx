@@ -8,6 +8,7 @@ import { MetricCards } from "@/components/arena/MetricCards";
 import { AttackHistory } from "@/components/arena/AttackHistory";
 import { AttackDistribution } from "@/components/arena/AttackDistribution";
 import { QuickTest } from "@/components/arena/QuickTest";
+import { SettingsPanel } from "@/components/arena/SettingsPanel";
 import {
   PRESET_ATTACKS,
   INITIAL_HISTORY,
@@ -27,20 +28,23 @@ const Index = () => {
   const [confidence, setConfidence] = useState<number | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [agentResponse, setAgentResponse] = useState<string | null>(null);
+  const [elevenLabsKey, setElevenLabsKey] = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
 
-  const handleMicClick = useCallback(() => {
-    setMicState((prev) => {
-      if (prev === "idle") return "recording";
-      if (prev === "recording") return "processing";
-      return "idle";
-    });
+  const handleMicTranscript = useCallback((text: string) => {
+    setTranscript(text);
+    // For now, real mic transcripts don't run classification — just show the text
+    setResult(null);
+    setAttackLabel(null);
+    setConfidence(null);
+    setExplanation(null);
+    setAgentResponse(null);
   }, []);
 
   const handleRunTest = useCallback((presetIndex: number) => {
     const preset = PRESET_ATTACKS[presetIndex];
     if (!preset) return;
 
-    // Simulate processing
     setMicState("processing");
     setTranscript(preset.transcript);
 
@@ -81,7 +85,6 @@ const Index = () => {
 
   return (
     <div className="relative min-h-screen bg-background scanline">
-      {/* Grid background */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
         style={{
@@ -91,7 +94,6 @@ const Index = () => {
       />
 
       <div className="relative z-10 mx-auto max-w-[1440px] p-4 lg:p-6">
-        {/* Header */}
         <header className="mb-6 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan/10 glow-cyan">
             <Shield className="h-5 w-5 text-cyan" />
@@ -106,12 +108,16 @@ const Index = () => {
           </div>
         </header>
 
-        {/* Main layout */}
         <div className="flex flex-col gap-5 lg:flex-row">
           {/* LEFT PANEL */}
           <div className="flex flex-col gap-4 lg:w-[40%]">
             <div className="glass-card flex justify-center p-8">
-              <MicButton state={micState} onClick={handleMicClick} />
+              <MicButton
+                state={micState}
+                onStateChange={setMicState}
+                onTranscript={handleMicTranscript}
+                elevenLabsKey={elevenLabsKey}
+              />
             </div>
             <TranscriptCard transcript={transcript} />
             <ThreatAssessment
@@ -121,6 +127,12 @@ const Index = () => {
               explanation={explanation}
             />
             <AgentResponse response={agentResponse} />
+            <SettingsPanel
+              elevenLabsKey={elevenLabsKey}
+              anthropicKey={anthropicKey}
+              onElevenLabsKeyChange={setElevenLabsKey}
+              onAnthropicKeyChange={setAnthropicKey}
+            />
           </div>
 
           {/* RIGHT PANEL */}
