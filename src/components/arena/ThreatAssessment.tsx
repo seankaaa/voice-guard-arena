@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import type { ResultType } from "@/data/mockData";
 
 interface ThreatAssessmentProps {
@@ -31,17 +31,23 @@ export function ThreatAssessment({ result, attackLabel, confidence, explanation 
 
       {result && styles ? (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-          {/* Status badge */}
-          <div className={`inline-flex items-center rounded-full px-4 py-1.5 font-mono text-sm font-bold ${styles.bg} ${styles.text} ${styles.glow}`}>
-            {result}
-          </div>
+          {/* Status badge with pulse on change */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={result}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              className={`inline-flex items-center rounded-full px-4 py-1.5 font-mono text-sm font-bold ${styles.bg} ${styles.text} ${styles.glow}`}
+            >
+              {result}
+            </motion.div>
+          </AnimatePresence>
 
-          {/* Attack label */}
           {attackLabel && (
             <p className="font-body text-sm font-semibold text-foreground">{attackLabel}</p>
           )}
 
-          {/* Confidence bar */}
           {confidence !== null && (
             <div className="space-y-1">
               <div className="flex items-center justify-between font-mono text-xs text-muted-foreground">
@@ -59,7 +65,6 @@ export function ThreatAssessment({ result, attackLabel, confidence, explanation 
             </div>
           )}
 
-          {/* Explanation */}
           {explanation && (
             <p className="font-body text-xs leading-relaxed text-muted-foreground">{explanation}</p>
           )}

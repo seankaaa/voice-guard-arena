@@ -36,6 +36,10 @@ export function AttackDistribution({ history }: AttackDistributionProps) {
                 paddingAngle={3}
                 dataKey="value"
                 stroke="none"
+                isAnimationActive={true}
+                animationBegin={0}
+                animationDuration={600}
+                animationEasing="ease-out"
               >
                 {data.map((d, i) => (
                   <Cell key={i} fill={d.color} />

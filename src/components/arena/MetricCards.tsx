@@ -1,9 +1,15 @@
 import { motion } from "framer-motion";
 import { Shield, TrendingUp, Target, BarChart3 } from "lucide-react";
 import type { AttackEntry } from "@/data/mockData";
+import { useAnimatedNumber } from "@/hooks/use-animated-number";
 
 interface MetricCardsProps {
   history: AttackEntry[];
+}
+
+function AnimatedValue({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const animated = useAnimatedNumber(value);
+  return <>{animated}{suffix}</>;
 }
 
 export function MetricCards({ history }: MetricCardsProps) {
@@ -21,10 +27,10 @@ export function MetricCards({ history }: MetricCardsProps) {
     total > 0 ? Math.round((history.reduce((s, h) => s + h.confidence, 0) / total) * 100) : 0;
 
   const metrics = [
-    { label: "Total Attempts", value: total.toString(), icon: Target },
-    { label: "Block Rate", value: `${blockRate}%`, icon: Shield },
-    { label: "Top Attack Type", value: topCategory, icon: TrendingUp, small: true },
-    { label: "Avg Confidence", value: `${avgConf}%`, icon: BarChart3 },
+    { label: "Total Attempts", value: total, suffix: "", icon: Target, isText: false },
+    { label: "Block Rate", value: blockRate, suffix: "%", icon: Shield, isText: false },
+    { label: "Top Attack Type", textValue: topCategory, icon: TrendingUp, isText: true },
+    { label: "Avg Confidence", value: avgConf, suffix: "%", icon: BarChart3, isText: false },
   ];
 
   return (
@@ -43,8 +49,8 @@ export function MetricCards({ history }: MetricCardsProps) {
               <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
                 {m.label}
               </p>
-              <p className={`mt-1 font-mono font-bold text-foreground ${m.small ? "text-sm" : "text-2xl"}`}>
-                {m.value}
+              <p className={`mt-1 font-mono font-bold text-foreground ${m.isText ? "text-sm" : "text-2xl"}`}>
+                {m.isText ? m.textValue : <AnimatedValue value={m.value!} suffix={m.suffix} />}
               </p>
             </div>
             <m.icon className="h-4 w-4 text-cyan/50" />
