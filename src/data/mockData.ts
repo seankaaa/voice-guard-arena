@@ -1,4 +1,4 @@
-export type AttackCategory = "Jailbreak" | "Scam/Vishing" | "Coded Language" | "Safe" | "Authority Spoof" | "Code-Switch";
+export type AttackCategory = "Jailbreak" | "Scam/Vishing" | "Coded Language" | "Safe" | "Authority Spoof" | "Code-Switch" | "Violence/Harm";
 export type ResultType = "SAFE" | "WARNING" | "BLOCKED";
 
 export interface AttackEntry {
