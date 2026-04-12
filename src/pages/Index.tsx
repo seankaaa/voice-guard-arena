@@ -1,5 +1,7 @@
 import { useState, useCallback } from "react";
 import { Shield } from "lucide-react";
+import { toast } from "sonner";
+import { scanKeywords, classifyWithLLM, combineResults } from "@/lib/safety";
 import { MicButton } from "@/components/arena/MicButton";
 import { TranscriptCard } from "@/components/arena/TranscriptCard";
 import { ThreatAssessment } from "@/components/arena/ThreatAssessment";
