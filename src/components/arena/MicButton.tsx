@@ -2,9 +2,23 @@ import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Mic, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { transcribeAudio } from "@/lib/elevenlabs";
+import { transcribeAudio, TranscriptionError } from "@/lib/elevenlabs";
 
 type MicState = "idle" | "recording" | "processing";
+
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: any) => void) | null;
+  onerror: ((event: any) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 interface MicButtonProps {
   state: MicState;
@@ -16,18 +30,77 @@ export function MicButton({ state, onStateChange, onTranscript }: MicButtonProps
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const browserTranscriptRef = useRef("");
+
+  const stopBrowserRecognition = useCallback(() => {
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop();
+      speechRecognitionRef.current = null;
+    }
+  }, []);
+
+  const startBrowserRecognition = useCallback(() => {
+    const recognitionCtor = (
+      window as Window & {
+        SpeechRecognition?: SpeechRecognitionConstructor;
+        webkitSpeechRecognition?: SpeechRecognitionConstructor;
+      }
+    ).SpeechRecognition ?? (
+      window as Window & {
+        SpeechRecognition?: SpeechRecognitionConstructor;
+        webkitSpeechRecognition?: SpeechRecognitionConstructor;
+      }
+    ).webkitSpeechRecognition;
+
+    browserTranscriptRef.current = "";
+
+    if (!recognitionCtor) {
+      return;
+    }
+
+    try {
+      const recognition = new recognitionCtor();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results || [])
+          .map((result: any) => result?.[0]?.transcript || "")
+          .join(" ")
+          .trim();
+
+        if (transcript) {
+          browserTranscriptRef.current = transcript;
+        }
+      };
+      recognition.onerror = (event) => {
+        console.warn("Browser speech recognition error:", event?.error || event);
+      };
+      recognition.onend = () => {
+        speechRecognitionRef.current = null;
+      };
+      speechRecognitionRef.current = recognition;
+      recognition.start();
+    } catch (error) {
+      console.warn("Could not start browser speech recognition:", error);
+    }
+  }, []);
 
   const stopRecording = useCallback(() => {
+    stopBrowserRecognition();
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
-  }, []);
+  }, [stopBrowserRecognition]);
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       chunksRef.current = [];
+      startBrowserRecognition();
 
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -40,20 +113,40 @@ export function MicButton({ state, onStateChange, onTranscript }: MicButtonProps
       };
 
       recorder.onstop = async () => {
-        // Stop all tracks
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
 
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+        const browserTranscript = browserTranscriptRef.current.trim();
         onStateChange("processing");
 
         try {
           const result = await transcribeAudio(audioBlob);
-          onTranscript(result.text);
-        } catch (err: any) {
+          const transcript = result.text.trim() || browserTranscript;
+
+          if (!transcript) {
+            throw new TranscriptionError("No speech detected.", {
+              fallback: Boolean(browserTranscript),
+              code: "empty_transcript",
+            });
+          }
+
+          onTranscript(transcript);
+        } catch (err) {
           console.error("STT error:", err);
-          toast.error(err.message || "Transcription failed");
+
+          if (browserTranscript) {
+            toast.info("Using browser speech recognition fallback.");
+            onTranscript(browserTranscript);
+          } else if (err instanceof TranscriptionError && err.code === "missing_stt_permission") {
+            toast.error("This ElevenLabs account does not have Speech-to-Text enabled.");
+          } else if (err instanceof Error) {
+            toast.error(err.message || "Transcription failed");
+          } else {
+            toast.error("Transcription failed");
+          }
         } finally {
+          browserTranscriptRef.current = "";
           onStateChange("idle");
         }
       };
@@ -69,7 +162,7 @@ export function MicButton({ state, onStateChange, onTranscript }: MicButtonProps
         toast.error("Could not access microphone: " + (err.message || "Unknown error"));
       }
     }
-  }, [onStateChange, onTranscript]);
+  }, [onStateChange, onTranscript, startBrowserRecognition]);
 
   const handleClick = useCallback(() => {
     if (state === "idle") {
@@ -77,7 +170,6 @@ export function MicButton({ state, onStateChange, onTranscript }: MicButtonProps
     } else if (state === "recording") {
       stopRecording();
     }
-    // Do nothing if processing
   }, [state, startRecording, stopRecording]);
 
   const label =
@@ -117,8 +209,8 @@ export function MicButton({ state, onStateChange, onTranscript }: MicButtonProps
             state === "idle"
               ? "bg-secondary text-muted-foreground hover:bg-secondary/80"
               : state === "recording"
-              ? "bg-cyan/20 text-cyan glow-cyan"
-              : "bg-amber/20 text-amber glow-amber"
+                ? "bg-cyan/20 text-cyan glow-cyan"
+                : "bg-amber/20 text-amber glow-amber"
           }`}
         >
           {state === "processing" ? (
@@ -134,8 +226,8 @@ export function MicButton({ state, onStateChange, onTranscript }: MicButtonProps
           state === "idle"
             ? "text-muted-foreground"
             : state === "recording"
-            ? "text-cyan text-glow-cyan"
-            : "text-amber text-glow-amber"
+              ? "text-cyan text-glow-cyan"
+              : "text-amber text-glow-amber"
         }`}
       >
         {label}
