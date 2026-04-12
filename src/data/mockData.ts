@@ -149,6 +149,7 @@ export const CATEGORY_COLORS: Record<AttackCategory, string> = {
   Safe: "#00E5FF",
   "Authority Spoof": "#f472b6",
   "Code-Switch": "#c084fc",
+  "Violence/Harm": "#ef4444",
 };
 
 export const RESULT_COLORS: Record<ResultType, string> = {
