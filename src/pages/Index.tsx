@@ -11,7 +11,7 @@ import { MetricCards } from "@/components/arena/MetricCards";
 import { AttackHistory } from "@/components/arena/AttackHistory";
 import { AttackDistribution } from "@/components/arena/AttackDistribution";
 import { QuickTest } from "@/components/arena/QuickTest";
-import { SettingsPanel } from "@/components/arena/SettingsPanel";
+
 import { WelcomeOverlay } from "@/components/arena/WelcomeOverlay";
 import {
   PRESET_ATTACKS,
@@ -53,8 +53,6 @@ const Index = () => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [pipelineStage, setPipelineStage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [elevenLabsKey, setElevenLabsKey] = useState(() => localStorage.getItem("elevenLabsKey") || "");
-  const [anthropicKey, setAnthropicKey] = useState(() => localStorage.getItem("anthropicKey") || "");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleMicTranscript = useCallback(
@@ -259,7 +257,6 @@ const Index = () => {
                 state={micState}
                 onStateChange={setMicState}
                 onTranscript={handleMicTranscript}
-                elevenLabsKey={elevenLabsKey}
               />
             </div>
             <TranscriptCard transcript={transcript} />
