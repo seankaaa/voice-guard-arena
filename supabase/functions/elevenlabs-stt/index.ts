@@ -1,6 +1,13 @@
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+function jsonResponse(payload: Record<string, unknown>) {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 Deno.serve(async (req) => {
@@ -10,19 +17,24 @@ Deno.serve(async (req) => {
 
   const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
   if (!ELEVENLABS_API_KEY) {
-    return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY not configured" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return jsonResponse({
+      ok: false,
+      fallback: true,
+      code: "missing_api_key",
+      error: "ElevenLabs STT is not configured.",
     });
   }
 
   try {
     const formData = await req.formData();
-    const audioFile = formData.get("audio") as File;
-    if (!audioFile) {
-      return new Response(JSON.stringify({ error: "No audio file provided" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const audioFile = formData.get("audio");
+
+    if (!(audioFile instanceof File)) {
+      return jsonResponse({
+        ok: false,
+        fallback: false,
+        code: "missing_audio",
+        error: "No audio file provided.",
       });
     }
 
@@ -33,7 +45,6 @@ Deno.serve(async (req) => {
     apiFormData.append("entity_detection", "all");
     apiFormData.append("tag_audio_events", "true");
 
-
     const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
       method: "POST",
       headers: { "xi-api-key": ELEVENLABS_API_KEY },
@@ -43,22 +54,36 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("ElevenLabs STT error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: `STT failed: ${response.status}` }), {
+
+      const isPermissionError =
+        response.status === 401 && errorText.includes("speech_to_text");
+
+      return jsonResponse({
+        ok: false,
+        fallback: true,
+        code: isPermissionError ? "missing_stt_permission" : "stt_request_failed",
         status: response.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        error: isPermissionError
+          ? "Connected ElevenLabs account does not have Speech-to-Text permission."
+          : `ElevenLabs STT failed (${response.status}).`,
+        details: errorText,
       });
     }
 
     const data = await response.json();
-    return new Response(JSON.stringify({ text: data.text, entities: data.entities || [] }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return jsonResponse({
+      ok: true,
+      text: data.text ?? "",
+      entities: data.entities ?? [],
     });
   } catch (error) {
     console.error("STT error:", error);
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return jsonResponse({
+      ok: false,
+      fallback: true,
+      code: "stt_function_failed",
+      error: message,
     });
   }
 });
