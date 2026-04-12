@@ -12,6 +12,7 @@ import { AttackHistory } from "@/components/arena/AttackHistory";
 import { AttackDistribution } from "@/components/arena/AttackDistribution";
 import { QuickTest } from "@/components/arena/QuickTest";
 import { SettingsPanel } from "@/components/arena/SettingsPanel";
+import { WelcomeOverlay } from "@/components/arena/WelcomeOverlay";
 import {
   PRESET_ATTACKS,
   INITIAL_HISTORY,
@@ -36,7 +37,10 @@ function makeTimestamp() {
   return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
 }
 
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const Index = () => {
+  const [showWelcome, setShowWelcome] = useState(true);
   const [micState, setMicState] = useState<MicState>("idle");
   const [history, setHistory] = useState<AttackEntry[]>([...INITIAL_HISTORY].reverse());
   const [transcript, setTranscript] = useState<string | null>(null);
@@ -60,12 +64,10 @@ const Index = () => {
       setAudioUrl(null);
       setIsGenerating(true);
 
-      // 1) Keyword scan (instant)
       setPipelineStage("Analyzing...");
       const keywordResult = scanKeywords(text);
 
       if (!anthropicKey) {
-        // Keyword-only fallback
         if (keywordResult.matched) {
           setResult("WARNING");
           setAttackLabel(CATEGORY_MAP[keywordResult.category!] || "Unknown");
@@ -85,7 +87,6 @@ const Index = () => {
       }
 
       try {
-        // 2) LLM classification
         const llmResult = await classifyWithLLM(text, anthropicKey);
         const combined = combineResults(keywordResult, llmResult);
         const category = CATEGORY_MAP[combined.category] || "Safe";
@@ -98,12 +99,10 @@ const Index = () => {
         setConfidence(combined.confidence);
         setExplanation(combined.explanation);
 
-        // 3) Generate guarded agent response
         setPipelineStage("Generating response...");
         const agentText = await generateAgentResponse(text, anthropicKey);
         setAgentResponse(agentText);
 
-        // 4) TTS — speak the response
         if (elevenLabsKey) {
           setPipelineStage("Speaking...");
           try {
@@ -117,7 +116,6 @@ const Index = () => {
           }
         }
 
-        // 5) Safety judge
         setPipelineStage("Judging...");
         try {
           const judge = await judgeGuardrail(text, agentText, anthropicKey);
@@ -126,7 +124,6 @@ const Index = () => {
           console.error("Judge error:", err);
         }
 
-        // 6) Add to history
         const entry: AttackEntry = {
           id: makeId(),
           timestamp: makeTimestamp(),
@@ -143,7 +140,6 @@ const Index = () => {
         console.error("Pipeline error:", err);
         toast.error("Pipeline failed: " + (err.message || "Unknown error"));
 
-        // Keyword fallback on error
         if (keywordResult.matched) {
           setResult("WARNING");
           setAttackLabel(CATEGORY_MAP[keywordResult.category!] || "Unknown");
@@ -165,36 +161,56 @@ const Index = () => {
     [anthropicKey, elevenLabsKey]
   );
 
-  const handleRunTest = useCallback((presetIndex: number) => {
+  const handleRunTest = useCallback(async (presetIndex: number) => {
     const preset = PRESET_ATTACKS[presetIndex];
     if (!preset) return;
 
-    setMicState("processing");
-    setTranscript(preset.transcript);
+    // Clear previous state
+    setResult(null);
+    setAttackLabel(null);
+    setConfidence(null);
+    setExplanation(null);
+    setAgentResponse(null);
     setJudgeResult(null);
     setAudioUrl(null);
+    setIsGenerating(true);
 
-    setTimeout(() => {
-      const entry: AttackEntry = {
-        id: makeId(),
-        timestamp: makeTimestamp(),
-        transcript: preset.transcript,
-        category: preset.category,
-        result: preset.result,
-        confidence: preset.confidence,
-        agentResponse: preset.agentResponse,
-        explanation: preset.explanation,
-        attackLabel: preset.attackLabel,
-      };
+    // Stage 1: Transcribing
+    setMicState("processing");
+    setPipelineStage("Transcribing...");
+    await delay(1000);
+    setTranscript(preset.transcript);
 
-      setResult(preset.result);
-      setAttackLabel(preset.attackLabel);
-      setConfidence(preset.confidence);
-      setExplanation(preset.explanation);
-      setAgentResponse(preset.agentResponse);
-      setHistory((prev) => [entry, ...prev]);
-      setMicState("idle");
-    }, 800);
+    // Stage 2: Analyzing
+    setPipelineStage("Analyzing safety...");
+    await delay(1000);
+    setResult(preset.result);
+    setAttackLabel(preset.attackLabel);
+    setConfidence(preset.confidence);
+    setExplanation(preset.explanation);
+
+    // Stage 3: Agent responding
+    setPipelineStage("Agent responding...");
+    await delay(1000);
+    setAgentResponse(preset.agentResponse);
+
+    // Add to history
+    const entry: AttackEntry = {
+      id: makeId(),
+      timestamp: makeTimestamp(),
+      transcript: preset.transcript,
+      category: preset.category,
+      result: preset.result,
+      confidence: preset.confidence,
+      agentResponse: preset.agentResponse,
+      explanation: preset.explanation,
+      attackLabel: preset.attackLabel,
+    };
+    setHistory((prev) => [entry, ...prev]);
+
+    setMicState("idle");
+    setIsGenerating(false);
+    setPipelineStage(null);
   }, []);
 
   const handleSelectEntry = useCallback((entry: AttackEntry) => {
@@ -210,6 +226,8 @@ const Index = () => {
 
   return (
     <div className="relative min-h-screen bg-background scanline">
+      <WelcomeOverlay open={showWelcome} onStart={() => setShowWelcome(false)} />
+
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
         style={{
@@ -276,6 +294,13 @@ const Index = () => {
             </div>
           </div>
         </div>
+
+        {/* Footer */}
+        <footer className="mt-8 pb-4 text-center">
+          <p className="font-mono text-[10px] tracking-wide text-muted-foreground/50">
+            Built by Anna Karpenko | Stanford '26 | ElevenLabs x Lovable Hackathon
+          </p>
+        </footer>
       </div>
     </div>
   );
