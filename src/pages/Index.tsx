@@ -106,7 +106,7 @@ const Index = () => {
         if (elevenLabsKey) {
           setPipelineStage("Speaking...");
           try {
-            const url = await textToSpeech(agentText, elevenLabsKey);
+            const url = await textToSpeech(agentText);
             setAudioUrl(url);
             const audio = new Audio(url);
             audioRef.current = audio;

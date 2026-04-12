@@ -54,7 +54,7 @@ export function MicButton({ state, onStateChange, onTranscript, elevenLabsKey }:
         onStateChange("processing");
 
         try {
-          const result = await transcribeAudio(audioBlob, elevenLabsKey);
+          const result = await transcribeAudio(audioBlob);
           onTranscript(result.text);
         } catch (err: any) {
           console.error("STT error:", err);
