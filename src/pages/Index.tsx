@@ -279,8 +279,8 @@ const Index = () => {
             <SettingsPanel
               elevenLabsKey={elevenLabsKey}
               anthropicKey={anthropicKey}
-              onElevenLabsKeyChange={setElevenLabsKey}
-              onAnthropicKeyChange={setAnthropicKey}
+              onElevenLabsKeyChange={(k) => { setElevenLabsKey(k); localStorage.setItem("elevenLabsKey", k); }}
+              onAnthropicKeyChange={(k) => { setAnthropicKey(k); localStorage.setItem("anthropicKey", k); }}
             />
           </div>
 
