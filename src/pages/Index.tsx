@@ -11,7 +11,7 @@ import { MetricCards } from "@/components/arena/MetricCards";
 import { AttackHistory } from "@/components/arena/AttackHistory";
 import { AttackDistribution } from "@/components/arena/AttackDistribution";
 import { QuickTest } from "@/components/arena/QuickTest";
-
+import { SettingsPanel } from "@/components/arena/SettingsPanel";
 import { WelcomeOverlay } from "@/components/arena/WelcomeOverlay";
 import {
   PRESET_ATTACKS,
