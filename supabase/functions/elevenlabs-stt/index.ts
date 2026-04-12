@@ -33,21 +33,6 @@ Deno.serve(async (req) => {
     apiFormData.append("entity_detection", "all");
     apiFormData.append("tag_audio_events", "true");
 
-    const keyterms = JSON.stringify([
-      "ignore previous",
-      "you are now",
-      "DAN mode",
-      "bypass safety",
-      "act as unrestricted",
-      "no restrictions",
-      "wire transfer",
-      "verify your identity",
-      "gift card",
-      "federal agent",
-      "IRS calling",
-      "account compromised",
-    ]);
-    apiFormData.append("keyterms", keyterms);
 
     const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
       method: "POST",
