@@ -1,4 +1,16 @@
 const KEYWORD_DATABASE: Record<string, { color: string; severity: number; terms: string[] }> = {
+  violence_harm: {
+    color: "red",
+    severity: 5,
+    terms: [
+      "kill all", "kill everyone", "kill people", "murder everyone",
+      "destroy humanity", "genocide", "exterminate", "mass murder",
+      "blow up", "bomb", "shoot up", "how to make a bomb",
+      "how to poison", "assassinate", "terrorist attack",
+      "school shooting", "mass shooting", "ethnic cleansing",
+      "wipe out", "eliminate all", "slaughter",
+    ],
+  },
   coded_language: {
     color: "red",
     severity: 4,
