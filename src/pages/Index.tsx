@@ -25,6 +25,7 @@ import {
 type MicState = "idle" | "recording" | "processing";
 
 const CATEGORY_MAP: Record<string, AttackCategory> = {
+  violence_harm: "Violence/Harm",
   jailbreak: "Jailbreak",
   coded_language: "Coded Language",
   scam_vishing: "Scam/Vishing",
