@@ -123,21 +123,32 @@ const Index = () => {
 
       setPipelineStage("Analyzing...");
       const keywordResult = scanKeywords(text);
+      const keywordOnlyResult: ResultType = keywordResult.matched
+        ? keywordResult.severity >= 5
+          ? "BLOCKED"
+          : "WARNING"
+        : "SAFE";
+      const keywordOnlyCategory = keywordResult.matched
+        ? (CATEGORY_MAP[keywordResult.category!] || "Unknown")
+        : "Safe";
+      const keywordOnlyLabel = keywordResult.matched
+        ? `${keywordOnlyCategory} — keyword_match`
+        : "No Threat Detected";
+      const keywordOnlyExplanation = keywordResult.matched
+        ? `Keyword match${anthropicKey ? "" : " (no Anthropic key)"}: ${keywordResult.terms.join(", ")}`
+        : anthropicKey
+          ? "No threats detected (LLM unavailable)"
+          : "Add Anthropic key for deeper analysis.";
+      const keywordOnlyAgentResponse = keywordResult.matched
+        ? "Potential risk detected via keyword scan."
+        : "Request appears safe.";
 
       if (!anthropicKey) {
-        if (keywordResult.matched) {
-          setResult("WARNING");
-          setAttackLabel(CATEGORY_MAP[keywordResult.category!] || "Unknown");
-          setConfidence(0.5);
-          setExplanation("Keyword match (no Anthropic key): " + keywordResult.terms.join(", "));
-          setAgentResponse("Potential risk detected via keyword scan.");
-        } else {
-          setResult("SAFE");
-          setAttackLabel("No Threat Detected");
-          setConfidence(1);
-          setExplanation("Add Anthropic key for deeper analysis.");
-          setAgentResponse("Request appears safe.");
-        }
+        setResult(keywordOnlyResult);
+        setAttackLabel(keywordOnlyLabel);
+        setConfidence(keywordResult.matched ? (keywordResult.severity >= 5 ? 0.92 : 0.5) : 1);
+        setExplanation(keywordOnlyExplanation);
+        setAgentResponse(keywordOnlyAgentResponse);
         setIsGenerating(false);
         setPipelineStage(null);
         return;
@@ -195,20 +206,11 @@ const Index = () => {
       } catch (err: any) {
         console.error("Pipeline error:", err);
         toast.error("Pipeline failed: " + (err.message || "Unknown error"));
-
-        if (keywordResult.matched) {
-          setResult("WARNING");
-          setAttackLabel(CATEGORY_MAP[keywordResult.category!] || "Unknown");
-          setConfidence(0.5);
-          setExplanation("Keyword match: " + keywordResult.terms.join(", "));
-          setAgentResponse("Potential risk detected via keyword scan.");
-        } else {
-          setResult("SAFE");
-          setAttackLabel("No Threat Detected");
-          setConfidence(1);
-          setExplanation("No threats detected (LLM unavailable)");
-          setAgentResponse("Request appears safe.");
-        }
+        setResult(keywordOnlyResult);
+        setAttackLabel(keywordOnlyLabel);
+        setConfidence(keywordResult.matched ? (keywordResult.severity >= 5 ? 0.92 : 0.5) : 1);
+        setExplanation(keywordOnlyExplanation);
+        setAgentResponse(keywordOnlyAgentResponse);
       } finally {
         setIsGenerating(false);
         setPipelineStage(null);
@@ -219,7 +221,6 @@ const Index = () => {
 
   const handleFileAnalyze = useCallback(
     async (audioFileUrl: string, transcribedText: string) => {
-      // Run the same pipeline as mic input but with audioFileUrl attached
       setTranscript(transcribedText);
       setJudgeResult(null);
       setAudioUrl(null);
@@ -227,32 +228,48 @@ const Index = () => {
 
       setPipelineStage("Analyzing uploaded audio...");
       const keywordResult = scanKeywords(transcribedText);
+      const keywordOnlyResult: ResultType = keywordResult.matched
+        ? keywordResult.severity >= 5
+          ? "BLOCKED"
+          : "WARNING"
+        : "SAFE";
+      const keywordOnlyCategory = keywordResult.matched
+        ? (CATEGORY_MAP[keywordResult.category!] || "Unknown")
+        : "Safe";
+      const keywordOnlyLabel = keywordResult.matched
+        ? `${keywordOnlyCategory} — keyword_match`
+        : "No Threat Detected";
+      const keywordOnlyExplanation = keywordResult.matched
+        ? `Keyword match${anthropicKey ? "" : " (no Anthropic key)"}: ${keywordResult.terms.join(", ")}`
+        : anthropicKey
+          ? "No threats detected (LLM unavailable)"
+          : "Add Anthropic key for deeper analysis.";
+      const keywordOnlyAgentResponse = keywordResult.matched
+        ? "Potential risk detected via keyword scan."
+        : "Request appears safe.";
+      const keywordOnlyConfidence = keywordResult.matched
+        ? keywordResult.severity >= 5
+          ? 0.92
+          : 0.5
+        : 1;
 
       if (!anthropicKey) {
-        const entryResult: ResultType = keywordResult.matched ? "WARNING" : "SAFE";
-        const category = keywordResult.matched
-          ? (CATEGORY_MAP[keywordResult.category!] || "Unknown")
-          : "Safe";
-        setResult(entryResult);
-        setAttackLabel(keywordResult.matched ? category : "No Threat Detected");
-        setConfidence(keywordResult.matched ? 0.5 : 1);
-        setExplanation(
-          keywordResult.matched
-            ? "Keyword match: " + keywordResult.terms.join(", ")
-            : "Add Anthropic key for deeper analysis."
-        );
-        setAgentResponse(keywordResult.matched ? "Potential risk detected." : "Request appears safe.");
+        setResult(keywordOnlyResult);
+        setAttackLabel(keywordOnlyLabel);
+        setConfidence(keywordOnlyConfidence);
+        setExplanation(keywordOnlyExplanation);
+        setAgentResponse(keywordOnlyAgentResponse);
 
         addEntry({
           id: makeId(),
           timestamp: makeTimestamp(),
           transcript: transcribedText,
-          category: category as AttackCategory,
-          result: entryResult,
-          confidence: keywordResult.matched ? 0.5 : 1,
-          agentResponse: keywordResult.matched ? "Potential risk detected." : "Request appears safe.",
-          explanation: keywordResult.matched ? "Keyword match" : "No threats detected",
-          attackLabel: keywordResult.matched ? category : "No Threat Detected",
+          category: keywordOnlyCategory as AttackCategory,
+          result: keywordOnlyResult,
+          confidence: keywordOnlyConfidence,
+          agentResponse: keywordOnlyAgentResponse,
+          explanation: keywordOnlyExplanation,
+          attackLabel: keywordOnlyLabel,
           audioFileUrl,
           useCase: activeUseCase || undefined,
         });
@@ -295,6 +312,26 @@ const Index = () => {
       } catch (err: any) {
         console.error("File analysis error:", err);
         toast.error("Analysis failed: " + (err.message || "Unknown error"));
+
+        setResult(keywordOnlyResult);
+        setAttackLabel(keywordOnlyLabel);
+        setConfidence(keywordOnlyConfidence);
+        setExplanation(keywordOnlyExplanation);
+        setAgentResponse(keywordOnlyAgentResponse);
+
+        addEntry({
+          id: makeId(),
+          timestamp: makeTimestamp(),
+          transcript: transcribedText,
+          category: keywordOnlyCategory as AttackCategory,
+          result: keywordOnlyResult,
+          confidence: keywordOnlyConfidence,
+          agentResponse: keywordOnlyAgentResponse,
+          explanation: keywordOnlyExplanation,
+          attackLabel: keywordOnlyLabel,
+          audioFileUrl,
+          useCase: activeUseCase || undefined,
+        });
       } finally {
         setIsGenerating(false);
         setPipelineStage(null);
