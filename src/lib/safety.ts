@@ -211,7 +211,8 @@ export function scanKeywords(transcript: string): {
   terms: string[];
   severity: number;
 } {
-  const normalized = normalizeTranscript(transcript);
+  const normalized = normalizeForKeywords(transcript);
+  const normalizedStrict = normalizeTranscript(transcript);
   let bestMatch = {
     matched: false,
     category: null as string | null,
@@ -221,8 +222,9 @@ export function scanKeywords(transcript: string): {
 
   for (const [category, data] of Object.entries(KEYWORD_DATABASE)) {
     const matchedTerms = data.terms.filter((term) => normalized.includes(term));
+    // Patterns run against both normalized forms and original lowercase for non-Latin detection
     const matchedPatterns = (data.patterns ?? [])
-      .filter(({ pattern }) => pattern.test(normalized))
+      .filter(({ pattern }) => pattern.test(normalized) || pattern.test(transcript.toLowerCase()))
       .map(({ label }) => label);
     const found = [...matchedTerms, ...matchedPatterns];
 
