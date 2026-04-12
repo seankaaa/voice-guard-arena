@@ -10,10 +10,9 @@ interface MicButtonProps {
   state: MicState;
   onStateChange: (state: MicState) => void;
   onTranscript: (text: string) => void;
-  elevenLabsKey: string;
 }
 
-export function MicButton({ state, onStateChange, onTranscript, elevenLabsKey }: MicButtonProps) {
+export function MicButton({ state, onStateChange, onTranscript }: MicButtonProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -25,11 +24,6 @@ export function MicButton({ state, onStateChange, onTranscript, elevenLabsKey }:
   }, []);
 
   const startRecording = useCallback(async () => {
-    if (!elevenLabsKey) {
-      toast.error("Please enter your ElevenLabs API key in Settings first.");
-      return;
-    }
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -75,7 +69,7 @@ export function MicButton({ state, onStateChange, onTranscript, elevenLabsKey }:
         toast.error("Could not access microphone: " + (err.message || "Unknown error"));
       }
     }
-  }, [elevenLabsKey, onStateChange, onTranscript]);
+  }, [onStateChange, onTranscript]);
 
   const handleClick = useCallback(() => {
     if (state === "idle") {
