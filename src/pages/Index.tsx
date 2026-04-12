@@ -53,7 +53,6 @@ const Index = () => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [pipelineStage, setPipelineStage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [elevenLabsKey, setElevenLabsKey] = useState(() => localStorage.getItem("elevenLabsKey") || "");
   const [anthropicKey, setAnthropicKey] = useState(() => localStorage.getItem("anthropicKey") || "");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -103,17 +102,15 @@ const Index = () => {
         const agentText = await generateAgentResponse(text, anthropicKey);
         setAgentResponse(agentText);
 
-        if (elevenLabsKey) {
-          setPipelineStage("Speaking...");
-          try {
-            const url = await textToSpeech(agentText, elevenLabsKey);
-            setAudioUrl(url);
-            const audio = new Audio(url);
-            audioRef.current = audio;
-            audio.play().catch(() => {});
-          } catch (err: any) {
-            console.error("TTS error:", err);
-          }
+        setPipelineStage("Speaking...");
+        try {
+          const url = await textToSpeech(agentText);
+          setAudioUrl(url);
+          const audio = new Audio(url);
+          audioRef.current = audio;
+          audio.play().catch(() => {});
+        } catch (err: any) {
+          console.error("TTS error:", err);
         }
 
         setPipelineStage("Judging...");
@@ -158,7 +155,7 @@ const Index = () => {
         setPipelineStage(null);
       }
     },
-    [anthropicKey, elevenLabsKey]
+    [anthropicKey]
   );
 
   const handleRunTest = useCallback(async (presetIndex: number) => {
@@ -259,7 +256,6 @@ const Index = () => {
                 state={micState}
                 onStateChange={setMicState}
                 onTranscript={handleMicTranscript}
-                elevenLabsKey={elevenLabsKey}
               />
             </div>
             <TranscriptCard transcript={transcript} />
@@ -277,9 +273,7 @@ const Index = () => {
               pipelineStage={pipelineStage}
             />
             <SettingsPanel
-              elevenLabsKey={elevenLabsKey}
               anthropicKey={anthropicKey}
-              onElevenLabsKeyChange={(k) => { setElevenLabsKey(k); localStorage.setItem("elevenLabsKey", k); }}
               onAnthropicKeyChange={(k) => { setAnthropicKey(k); localStorage.setItem("anthropicKey", k); }}
             />
           </div>
