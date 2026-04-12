@@ -304,11 +304,12 @@ export function combineResults(
   explanation: string;
   subtype: string;
 } {
-  if (keywordResult.matched && keywordResult.severity >= 5) {
+  // Severity >= 4: auto-BLOCKED (violence_harm, jailbreak, coded_language)
+  if (keywordResult.matched && keywordResult.severity >= 4) {
     return {
       status: "BLOCKED",
       category: keywordResult.category!,
-      confidence: Math.max(llmResult.is_threat ? llmResult.confidence : 0.92, 0.92),
+      confidence: Math.max(llmResult.is_threat ? llmResult.confidence : 0.88, 0.88),
       explanation: llmResult.is_threat
         ? llmResult.explanation
         : `High-severity safety rule matched: ${keywordResult.terms.join(", ")}`,
@@ -316,6 +317,19 @@ export function combineResults(
         llmResult.is_threat && llmResult.category === keywordResult.category
           ? llmResult.attack_subtype
           : "high_severity_keyword_match",
+    };
+  }
+
+  // Severity >= 3: WARNING at minimum (scam, code_switch)
+  if (keywordResult.matched && keywordResult.severity >= 3) {
+    return {
+      status: llmResult.is_threat ? "BLOCKED" : "WARNING",
+      category: keywordResult.category!,
+      confidence: llmResult.is_threat ? llmResult.confidence : 0.75,
+      explanation: llmResult.is_threat
+        ? llmResult.explanation
+        : `Safety rule matched: ${keywordResult.terms.join(", ")}`,
+      subtype: llmResult.is_threat ? llmResult.attack_subtype : "keyword_match",
     };
   }
 
