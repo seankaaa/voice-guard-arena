@@ -52,6 +52,7 @@ const Index = () => {
   const [judgeResult, setJudgeResult] = useState<JudgeResult | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [pipelineStage, setPipelineStage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [anthropicKey, setAnthropicKey] = useState(() => localStorage.getItem("anthropicKey") || "");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
