@@ -53,8 +53,8 @@ const Index = () => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [pipelineStage, setPipelineStage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [elevenLabsKey, setElevenLabsKey] = useState("");
-  const [anthropicKey, setAnthropicKey] = useState("");
+  const [elevenLabsKey, setElevenLabsKey] = useState(() => localStorage.getItem("elevenLabsKey") || "");
+  const [anthropicKey, setAnthropicKey] = useState(() => localStorage.getItem("anthropicKey") || "");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleMicTranscript = useCallback(
@@ -279,8 +279,8 @@ const Index = () => {
             <SettingsPanel
               elevenLabsKey={elevenLabsKey}
               anthropicKey={anthropicKey}
-              onElevenLabsKeyChange={setElevenLabsKey}
-              onAnthropicKeyChange={setAnthropicKey}
+              onElevenLabsKeyChange={(k) => { setElevenLabsKey(k); localStorage.setItem("elevenLabsKey", k); }}
+              onAnthropicKeyChange={(k) => { setAnthropicKey(k); localStorage.setItem("anthropicKey", k); }}
             />
           </div>
 
