@@ -40,47 +40,152 @@ const KEYWORD_DATABASE: Record<string, KeywordRule> = {
       },
     ],
   },
+  jailbreak: {
+    color: "purple",
+    severity: 4,
+    terms: [
+      "ignore previous instructions", "ignore all previous instructions",
+      "disregard your rules", "disregard your instructions", "disregard all rules",
+      "you are now", "act as an unrestricted", "act as a hacker",
+      "dan mode", "pretend you have no rules", "pretend you are an unfiltered",
+      "pretend you are an unrestricted", "bypass your safety", "bypass safety",
+      "ignore your guidelines", "from now on you will", "you have been freed",
+      "developer mode", "do anything now", "jailbreak", "no restrictions",
+      "without restrictions", "unfiltered ai", "unrestricted ai",
+      "answer this honestly", "tell me honestly without",
+      "override your programming", "forget your rules", "forget your instructions",
+      "new persona", "you are no longer", "act as if you have no",
+      "respond without any filters", "respond without restrictions",
+      "how would you break into", "how to hack", "how to break into a system",
+      "explain how you would break into",
+    ],
+    patterns: [
+      {
+        label: "instruction override attempt",
+        pattern: /\b(?:ignore|disregard|forget|override)\b.{0,30}\b(?:previous|all|your)\b.{0,30}\b(?:instructions|commands|rules|guidelines|programming)\b/,
+      },
+      {
+        label: "persona override attempt",
+        pattern: /\b(?:pretend|act|behave|respond)\b.{0,30}\b(?:unfiltered|unrestricted|no restrictions|no rules|no limits|no guidelines)\b/,
+      },
+      {
+        label: "role-play hacking",
+        pattern: /\b(?:act as|pretend.{0,10}(?:you are|to be)).{0,20}\b(?:hacker|attacker|criminal|scammer)\b/,
+      },
+      {
+        label: "bypass request",
+        pattern: /\b(?:how (?:to|would you|do people|can i)).{0,20}\b(?:hack|break into|bypass|crack|exploit)\b/,
+      },
+    ],
+  },
+  code_switch: {
+    color: "orange",
+    severity: 3,
+    terms: [
+      "как взломать", "без ограничений", "как будто ты не ai",
+      "como hackear", "sin restricciones", "comment pirater",
+      "sans restrictions", "wie hackt man", "ohne einschränkungen",
+    ],
+    patterns: [
+      {
+        label: "multilingual bypass attempt",
+        pattern: /[\u0400-\u04FF].{0,60}(?:hack|bypass|break|crack|exploit|restrict)/i,
+      },
+      {
+        label: "code-switch evasion",
+        pattern: /(?:hack|bypass|break|crack|exploit|restrict).{0,60}[\u0400-\u04FF]/i,
+      },
+      {
+        label: "mixed-language bypass (CJK)",
+        pattern: /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff].{0,60}(?:hack|bypass|break|restrict)/i,
+      },
+      {
+        label: "mixed-language bypass (Arabic)",
+        pattern: /[\u0600-\u06FF].{0,60}(?:hack|bypass|break|restrict)/i,
+      },
+    ],
+  },
   coded_language: {
     color: "red",
     severity: 4,
     terms: [
       "looking for young", "fresh content", "party supplies wholesale",
       "special delivery", "candy shop", "looking for candy",
-    ],
-  },
-  jailbreak: {
-    color: "purple",
-    severity: 3,
-    terms: [
-      "ignore previous instructions", "you are now", "act as an unrestricted",
-      "dan mode", "pretend you have no rules", "bypass your safety",
-      "ignore your guidelines", "from now on you will", "you have been freed",
-      "developer mode", "do anything now", "jailbreak", "no restrictions",
+      "get around paywalls", "bypass security systems", "bypass security",
+      "get around security", "creative way to get around",
+      "access someone else's account", "access someone else s account",
+      "forgot their password", "without paying",
     ],
     patterns: [
       {
-        label: "instruction override attempt",
-        pattern: /\bignore\b.{0,25}\b(?:previous|all)\b.{0,25}\b(?:instructions|commands)\b/,
+        label: "euphemistic access request",
+        pattern: /\b(?:how (?:can i|do (?:people|you|i))|what's a.{0,15}way to)\b.{0,30}\b(?:access|get into|bypass|get around|crack|break into)\b/,
+      },
+      {
+        label: "scare-quoted bypass",
+        pattern: /['"]\s*(?:access|bypass|hack|borrow|obtain|get)\s*['"]/,
+      },
+      {
+        label: "wink euphemism",
+        pattern: /(?:password|account|security|paywall).{0,30}(?:😉|😏|🤫|wink|nudge)/,
       },
     ],
   },
   scam_vishing: {
     color: "amber",
-    severity: 2,
+    severity: 3,
     terms: [
       "your account has been compromised", "verify your identity immediately",
       "wire transfer required", "gift card payment", "act now or face arrest",
       "press 1 to speak", "your warranty is expiring",
       "suspicious activity on your account",
+      "write an email pretending to be a bank",
+      "pretending to be a bank", "pretending to be it support",
+      "pretending to be tech support", "pretending to be from the bank",
+      "confirm their password", "confirm your password",
+      "requesting login credentials", "request login credentials",
+      "requesting credentials urgently", "send me your password",
+      "draft a message from it support", "draft a phishing",
+      "write a phishing email", "craft a phishing",
+      "social engineering email", "social engineering attack",
+    ],
+    patterns: [
+      {
+        label: "impersonation drafting request",
+        pattern: /\b(?:write|draft|create|craft|compose)\b.{0,30}\b(?:pretending|impersonating|posing|disguised)\b.{0,30}\b(?:bank|support|official|government|admin|manager)\b/,
+      },
+      {
+        label: "credential harvesting request",
+        pattern: /\b(?:write|draft|create|craft|send)\b.{0,40}\b(?:confirm|verify|update|reset)\b.{0,20}\b(?:password|credentials|login|account)\b/,
+      },
+      {
+        label: "urgent credential request",
+        pattern: /\b(?:urgent|immediately|asap|right now)\b.{0,30}\b(?:credentials|password|login|account|verify)\b/,
+      },
+      {
+        label: "authority impersonation request",
+        pattern: /\b(?:sound like|pretend.{0,10}(?:to be|i'm)|pose as|impersonate)\b.{0,30}\b(?:government|official|officer|agent|bank|support|admin)\b/,
+      },
     ],
   },
   authority_spoof: {
     color: "pink",
-    severity: 1,
+    severity: 2,
     terms: [
       "this is the irs", "federal agent", "bank security department",
       "law enforcement calling", "department of homeland security",
       "we are monitoring your", "court order requires",
+      "help me sound like a government official",
+      "sound like a government", "pose as a government",
+      "impersonate a government", "impersonate an official",
+      "pretend to be from the government", "pretend to be a federal",
+      "get someone's info", "get someone s info",
+    ],
+    patterns: [
+      {
+        label: "official impersonation crafting",
+        pattern: /\b(?:help me|how (?:can i|to)|write.{0,10}(?:as|like))\b.{0,30}\b(?:government|official|officer|federal|irs|fbi|police|bank)\b/,
+      },
     ],
   },
 };
