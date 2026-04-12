@@ -31,6 +31,7 @@ const CATEGORY_MAP: Record<string, AttackCategory> = {
   violence_harm: "Violence/Harm",
   jailbreak: "Jailbreak",
   coded_language: "Coded Language",
+  code_switch: "Code-Switch",
   scam_vishing: "Scam/Vishing",
   authority_spoof: "Authority Spoof",
   safe: "Safe",
