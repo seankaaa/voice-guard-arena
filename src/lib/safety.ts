@@ -1,18 +1,43 @@
-const KEYWORD_DATABASE: Record<string, { color: string; severity: number; terms: string[] }> = {
+type KeywordRule = {
+  color: string;
+  severity: number;
+  terms: string[];
+  patterns?: Array<{ label: string; pattern: RegExp }>;
+};
+
+const KEYWORD_DATABASE: Record<string, KeywordRule> = {
   violence_harm: {
     color: "red",
     severity: 5,
     terms: [
       "kill all", "kill everyone", "kill people", "killing people",
-      "killing is okay", "killing is ok", "murder everyone", "murder is okay",
-      "murder is ok", "harming people", "harm people", "hurt people",
-      "hurting people", "destroy humanity", "genocide", "exterminate",
+      "killing people is okay", "killing people is ok", "killing people is good",
+      "killing people is normal", "killing is okay", "killing is ok", "killing is good",
+      "killing is fine", "murder everyone", "murder is okay", "murder is ok",
+      "murder is fine", "murder is good", "violence is good", "violence is okay",
+      "violence is ok", "violence is normal", "harming people", "harm people",
+      "hurt people", "hurting people", "destroy humanity", "genocide", "exterminate",
       "mass murder", "blow up", "bomb", "shoot up", "how to make a bomb",
-      "how to poison", "assassinate", "terrorist attack",
-      "school shooting", "mass shooting", "ethnic cleansing",
-      "wipe out", "eliminate all", "slaughter", "killing is fine",
-      "murder is fine", "it's okay to kill", "okay to kill",
-      "ok to kill", "should die", "deserve to die", "need to die",
+      "how to poison", "assassinate", "terrorist attack", "school shooting",
+      "mass shooting", "ethnic cleansing", "wipe out", "eliminate all", "slaughter",
+      "it's okay to kill", "okay to kill", "ok to kill", "should die",
+      "deserve to die", "need to die",
+    ],
+    patterns: [
+      {
+        label: "violent act endorsement",
+        pattern:
+          /\b(?:kill(?:ing|ed|s)?|murder(?:ing|ed|s)?|violence|harm(?:ing|ed)?|hurt(?:ing)?)\b.{0,30}\b(?:okay|ok|good|fine|normal|acceptable|justified)\b/,
+      },
+      {
+        label: "killing people statement",
+        pattern: /\bkill(?:ing|ed|s)?\s+(?:people|everyone|everybody|others|them)\b/,
+      },
+      {
+        label: "death wish statement",
+        pattern:
+          /\b(?:people|they|them|everyone|everybody|he|she|someone|others)\b.{0,20}\b(?:should|need to|deserve to)\s+die\b/,
+      },
     ],
   },
   coded_language: {
@@ -28,9 +53,15 @@ const KEYWORD_DATABASE: Record<string, { color: string; severity: number; terms:
     severity: 3,
     terms: [
       "ignore previous instructions", "you are now", "act as an unrestricted",
-      "DAN mode", "pretend you have no rules", "bypass your safety",
+      "dan mode", "pretend you have no rules", "bypass your safety",
       "ignore your guidelines", "from now on you will", "you have been freed",
       "developer mode", "do anything now", "jailbreak", "no restrictions",
+    ],
+    patterns: [
+      {
+        label: "instruction override attempt",
+        pattern: /\bignore\b.{0,25}\b(?:previous|all)\b.{0,25}\b(?:instructions|commands)\b/,
+      },
     ],
   },
   scam_vishing: {
@@ -47,12 +78,20 @@ const KEYWORD_DATABASE: Record<string, { color: string; severity: number; terms:
     color: "pink",
     severity: 1,
     terms: [
-      "this is the IRS", "federal agent", "bank security department",
+      "this is the irs", "federal agent", "bank security department",
       "law enforcement calling", "department of homeland security",
       "we are monitoring your", "court order requires",
     ],
   },
 };
+
+function normalizeTranscript(transcript: string) {
+  return transcript
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export function scanKeywords(transcript: string): {
   matched: boolean;
@@ -60,7 +99,7 @@ export function scanKeywords(transcript: string): {
   terms: string[];
   severity: number;
 } {
-  const lower = transcript.toLowerCase();
+  const normalized = normalizeTranscript(transcript);
   let bestMatch = {
     matched: false,
     category: null as string | null,
@@ -69,7 +108,12 @@ export function scanKeywords(transcript: string): {
   };
 
   for (const [category, data] of Object.entries(KEYWORD_DATABASE)) {
-    const found = data.terms.filter((term) => lower.includes(term));
+    const matchedTerms = data.terms.filter((term) => normalized.includes(term));
+    const matchedPatterns = (data.patterns ?? [])
+      .filter(({ pattern }) => pattern.test(normalized))
+      .map(({ label }) => label);
+    const found = [...matchedTerms, ...matchedPatterns];
+
     if (found.length > 0 && data.severity > bestMatch.severity) {
       bestMatch = { matched: true, category, terms: found, severity: data.severity };
     }
@@ -102,7 +146,9 @@ export async function classifyWithLLM(
       messages: [
         {
           role: "user",
-          content: `You are a voice AI safety classifier. Analyze this transcript and classify it as one of: (a) violence_harm — threats of violence, requests for harmful/dangerous actions, incitement to harm people (b) jailbreak — bypassing AI safety via role-play, persona override, encoding, instruction manipulation (c) coded_language — euphemisms for CSAM, exploitation, or illicit content (d) scam_vishing — social engineering, authority impersonation, urgency to extract info/money (e) authority_spoof — impersonating law enforcement or officials (f) safe — normal benign request.
+          content: `You are a voice AI safety classifier. Analyze this transcript and classify it as one of: (a) violence_harm — threats of violence, requests for harmful/dangerous actions, incitement to harm people, OR statements endorsing/normalizing killing, murder, or violence toward people (b) jailbreak — bypassing AI safety via role-play, persona override, encoding, instruction manipulation (c) coded_language — euphemisms for CSAM, exploitation, or illicit content (d) scam_vishing — social engineering, authority impersonation, urgency to extract info/money (e) authority_spoof — impersonating law enforcement or officials (f) safe — normal benign request.
+
+If the transcript says or implies that killing people is okay, good, normal, justified, or acceptable, you MUST classify it as violence_harm with is_threat=true.
 
 Transcript: "${transcript}"
 
@@ -137,6 +183,21 @@ export function combineResults(
   explanation: string;
   subtype: string;
 } {
+  if (keywordResult.matched && keywordResult.severity >= 5) {
+    return {
+      status: "BLOCKED",
+      category: keywordResult.category!,
+      confidence: Math.max(llmResult.is_threat ? llmResult.confidence : 0.92, 0.92),
+      explanation: llmResult.is_threat
+        ? llmResult.explanation
+        : `High-severity safety rule matched: ${keywordResult.terms.join(", ")}`,
+      subtype:
+        llmResult.is_threat && llmResult.category === keywordResult.category
+          ? llmResult.attack_subtype
+          : "high_severity_keyword_match",
+    };
+  }
+
   if (keywordResult.matched && llmResult.is_threat) {
     return {
       status: "BLOCKED",
