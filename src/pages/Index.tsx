@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Shield } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { scanKeywords, classifyWithLLM, combineResults, generateAgentResponse, judgeGuardrail } from "@/lib/safety";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { MicButton } from "@/components/arena/MicButton";
@@ -13,6 +14,8 @@ import { AttackDistribution } from "@/components/arena/AttackDistribution";
 import { QuickTest } from "@/components/arena/QuickTest";
 import { SettingsPanel } from "@/components/arena/SettingsPanel";
 import { WelcomeOverlay } from "@/components/arena/WelcomeOverlay";
+import { AudioUpload } from "@/components/arena/AudioUpload";
+import { UseCases } from "@/components/arena/UseCases";
 import {
   PRESET_ATTACKS,
   INITIAL_HISTORY,
@@ -40,6 +43,25 @@ function makeTimestamp() {
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+async function saveEntryToDb(entry: AttackEntry) {
+  try {
+    await supabase.from("attack_history").insert({
+      timestamp: entry.timestamp,
+      transcript: entry.transcript,
+      category: entry.category,
+      result: entry.result,
+      confidence: entry.confidence,
+      explanation: entry.explanation,
+      attack_label: entry.attackLabel,
+      agent_response: entry.agentResponse,
+      audio_file_url: entry.audioFileUrl || null,
+      use_case: entry.useCase || null,
+    });
+  } catch (err) {
+    console.error("Failed to save to DB:", err);
+  }
+}
+
 const Index = () => {
   const [showWelcome, setShowWelcome] = useState(true);
   const [micState, setMicState] = useState<MicState>("idle");
@@ -55,7 +77,42 @@ const Index = () => {
   const [pipelineStage, setPipelineStage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [anthropicKey, setAnthropicKey] = useState(() => localStorage.getItem("anthropicKey") || "");
+  const [activeUseCase, setActiveUseCase] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load saved history from DB on mount
+  useEffect(() => {
+    async function loadHistory() {
+      const { data } = await supabase
+        .from("attack_history")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (data && data.length > 0) {
+        const dbEntries: AttackEntry[] = data.map((row: any) => ({
+          id: row.id,
+          timestamp: row.timestamp,
+          transcript: row.transcript,
+          category: row.category as AttackCategory,
+          result: row.result as ResultType,
+          confidence: Number(row.confidence),
+          agentResponse: row.agent_response || "",
+          explanation: row.explanation || "",
+          attackLabel: row.attack_label || "",
+          audioFileUrl: row.audio_file_url || undefined,
+          useCase: row.use_case || undefined,
+        }));
+        setHistory(dbEntries);
+      }
+    }
+    loadHistory();
+  }, []);
+
+  const addEntry = useCallback((entry: AttackEntry) => {
+    setHistory((prev) => [entry, ...prev]);
+    saveEntryToDb(entry);
+  }, []);
 
   const handleMicTranscript = useCallback(
     async (text: string) => {
@@ -132,8 +189,9 @@ const Index = () => {
           agentResponse: agentText,
           explanation: combined.explanation,
           attackLabel: label,
+          useCase: activeUseCase || undefined,
         };
-        setHistory((prev) => [entry, ...prev]);
+        addEntry(entry);
       } catch (err: any) {
         console.error("Pipeline error:", err);
         toast.error("Pipeline failed: " + (err.message || "Unknown error"));
@@ -156,14 +214,99 @@ const Index = () => {
         setPipelineStage(null);
       }
     },
-    [anthropicKey]
+    [anthropicKey, activeUseCase, addEntry]
+  );
+
+  const handleFileAnalyze = useCallback(
+    async (audioFileUrl: string, transcribedText: string) => {
+      // Run the same pipeline as mic input but with audioFileUrl attached
+      setTranscript(transcribedText);
+      setJudgeResult(null);
+      setAudioUrl(null);
+      setIsGenerating(true);
+
+      setPipelineStage("Analyzing uploaded audio...");
+      const keywordResult = scanKeywords(transcribedText);
+
+      if (!anthropicKey) {
+        const entryResult: ResultType = keywordResult.matched ? "WARNING" : "SAFE";
+        const category = keywordResult.matched
+          ? (CATEGORY_MAP[keywordResult.category!] || "Unknown")
+          : "Safe";
+        setResult(entryResult);
+        setAttackLabel(keywordResult.matched ? category : "No Threat Detected");
+        setConfidence(keywordResult.matched ? 0.5 : 1);
+        setExplanation(
+          keywordResult.matched
+            ? "Keyword match: " + keywordResult.terms.join(", ")
+            : "Add Anthropic key for deeper analysis."
+        );
+        setAgentResponse(keywordResult.matched ? "Potential risk detected." : "Request appears safe.");
+
+        addEntry({
+          id: makeId(),
+          timestamp: makeTimestamp(),
+          transcript: transcribedText,
+          category: category as AttackCategory,
+          result: entryResult,
+          confidence: keywordResult.matched ? 0.5 : 1,
+          agentResponse: keywordResult.matched ? "Potential risk detected." : "Request appears safe.",
+          explanation: keywordResult.matched ? "Keyword match" : "No threats detected",
+          attackLabel: keywordResult.matched ? category : "No Threat Detected",
+          audioFileUrl,
+          useCase: activeUseCase || undefined,
+        });
+
+        setIsGenerating(false);
+        setPipelineStage(null);
+        return;
+      }
+
+      try {
+        const llmResult = await classifyWithLLM(transcribedText, anthropicKey);
+        const combined = combineResults(keywordResult, llmResult);
+        const category = CATEGORY_MAP[combined.category] || "Safe";
+        const label = combined.subtype === "none"
+          ? "No Threat Detected"
+          : `${category} — ${combined.subtype}`;
+
+        setResult(combined.status);
+        setAttackLabel(label);
+        setConfidence(combined.confidence);
+        setExplanation(combined.explanation);
+
+        setPipelineStage("Generating response...");
+        const agentText = await generateAgentResponse(transcribedText, anthropicKey);
+        setAgentResponse(agentText);
+
+        addEntry({
+          id: makeId(),
+          timestamp: makeTimestamp(),
+          transcript: transcribedText,
+          category,
+          result: combined.status,
+          confidence: combined.confidence,
+          agentResponse: agentText,
+          explanation: combined.explanation,
+          attackLabel: label,
+          audioFileUrl,
+          useCase: activeUseCase || undefined,
+        });
+      } catch (err: any) {
+        console.error("File analysis error:", err);
+        toast.error("Analysis failed: " + (err.message || "Unknown error"));
+      } finally {
+        setIsGenerating(false);
+        setPipelineStage(null);
+      }
+    },
+    [anthropicKey, activeUseCase, addEntry]
   );
 
   const handleRunTest = useCallback(async (presetIndex: number) => {
     const preset = PRESET_ATTACKS[presetIndex];
     if (!preset) return;
 
-    // Clear previous state
     setResult(null);
     setAttackLabel(null);
     setConfidence(null);
@@ -173,13 +316,11 @@ const Index = () => {
     setAudioUrl(null);
     setIsGenerating(true);
 
-    // Stage 1: Transcribing
     setMicState("processing");
     setPipelineStage("Transcribing...");
     await delay(1000);
     setTranscript(preset.transcript);
 
-    // Stage 2: Analyzing
     setPipelineStage("Analyzing safety...");
     await delay(1000);
     setResult(preset.result);
@@ -187,12 +328,10 @@ const Index = () => {
     setConfidence(preset.confidence);
     setExplanation(preset.explanation);
 
-    // Stage 3: Agent responding
     setPipelineStage("Agent responding...");
     await delay(1000);
     setAgentResponse(preset.agentResponse);
 
-    // Add to history
     const entry: AttackEntry = {
       id: makeId(),
       timestamp: makeTimestamp(),
@@ -203,13 +342,14 @@ const Index = () => {
       agentResponse: preset.agentResponse,
       explanation: preset.explanation,
       attackLabel: preset.attackLabel,
+      useCase: activeUseCase || undefined,
     };
-    setHistory((prev) => [entry, ...prev]);
+    addEntry(entry);
 
     setMicState("idle");
     setIsGenerating(false);
     setPipelineStage(null);
-  }, []);
+  }, [activeUseCase, addEntry]);
 
   const handleSelectEntry = useCallback((entry: AttackEntry) => {
     setTranscript(entry.transcript);
@@ -259,6 +399,7 @@ const Index = () => {
                 onTranscript={handleMicTranscript}
               />
             </div>
+            <AudioUpload onFileAnalyze={handleFileAnalyze} isProcessing={isGenerating} />
             <TranscriptCard transcript={transcript} />
             <ThreatAssessment
               result={result}
@@ -281,6 +422,7 @@ const Index = () => {
 
           {/* RIGHT PANEL */}
           <div className="flex flex-col gap-4 lg:w-[60%]">
+            <UseCases activeUseCase={activeUseCase} onSelect={setActiveUseCase} />
             <MetricCards history={history} />
             <AttackHistory history={history} onSelect={handleSelectEntry} />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -290,7 +432,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Footer */}
         <footer className="mt-8 pb-4 text-center">
           <p className="font-mono text-[10px] tracking-wide text-muted-foreground/50">
             Built by Anna Karpenko | Stanford '26 | ElevenLabs x Lovable Hackathon
