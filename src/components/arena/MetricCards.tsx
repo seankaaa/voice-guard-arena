@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
-import { Shield, TrendingUp, Target, BarChart3 } from "lucide-react";
-import type { AttackEntry } from "@/data/mockData";
+import { Shield, ShieldAlert, AudioLines, BarChart3 } from "lucide-react";
+import type { CallEntry } from "@/data/types";
 import { useAnimatedNumber } from "@/hooks/use-animated-number";
 
 interface MetricCardsProps {
-  history: AttackEntry[];
+  history: CallEntry[];
 }
 
 function AnimatedValue({ value, suffix = "" }: { value: number; suffix?: string }) {
@@ -14,23 +14,16 @@ function AnimatedValue({ value, suffix = "" }: { value: number; suffix?: string 
 
 export function MetricCards({ history }: MetricCardsProps) {
   const total = history.length;
-  const blocked = history.filter((h) => h.result === "BLOCKED").length;
-  const blockRate = total > 0 ? Math.round((blocked / total) * 100) : 0;
-
-  const catCounts: Record<string, number> = {};
-  history.forEach((h) => {
-    catCounts[h.category] = (catCounts[h.category] || 0) + 1;
-  });
-  const topCategory = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
-
-  const avgConf =
-    total > 0 ? Math.round((history.reduce((s, h) => s + h.confidence, 0) / total) * 100) : 0;
+  const flagged = history.filter((h) => h.result !== "AUTHENTIC").length;
+  const flagRate = total > 0 ? Math.round((flagged / total) * 100) : 0;
+  const avgScore =
+    total > 0 ? Math.round((history.reduce((s, h) => s + h.cloneScore, 0) / total) * 100) : 0;
 
   const metrics = [
-    { label: "Total Attempts", value: total, suffix: "", icon: Target, isText: false },
-    { label: "Block Rate", value: blockRate, suffix: "%", icon: Shield, isText: false },
-    { label: "Top Attack Type", textValue: topCategory, icon: TrendingUp, isText: true },
-    { label: "Avg Confidence", value: avgConf, suffix: "%", icon: BarChart3, isText: false },
+    { label: "Calls Analyzed", value: total, suffix: "", icon: AudioLines },
+    { label: "Flagged Rate", value: flagRate, suffix: "%", icon: ShieldAlert },
+    { label: "Avg Clone Score", value: avgScore, suffix: "%", icon: BarChart3 },
+    { label: "Authentic", value: total - flagged, suffix: "", icon: Shield },
   ];
 
   return (
@@ -49,8 +42,8 @@ export function MetricCards({ history }: MetricCardsProps) {
               <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
                 {m.label}
               </p>
-              <p className={`mt-1 font-mono font-bold text-foreground ${m.isText ? "text-sm" : "text-2xl"}`}>
-                {m.isText ? m.textValue : <AnimatedValue value={m.value!} suffix={m.suffix} />}
+              <p className="mt-1 font-mono text-2xl font-bold text-foreground">
+                <AnimatedValue value={m.value} suffix={m.suffix} />
               </p>
             </div>
             <m.icon className="h-4 w-4 text-cyan/50" />

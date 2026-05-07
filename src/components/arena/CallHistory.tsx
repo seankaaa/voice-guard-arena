@@ -1,18 +1,18 @@
 import { motion, AnimatePresence } from "framer-motion";
-import type { AttackEntry } from "@/data/mockData";
-import { CATEGORY_COLORS, RESULT_COLORS } from "@/data/mockData";
+import type { CallEntry } from "@/data/types";
+import { RESULT_COLORS } from "@/data/types";
 
-interface AttackHistoryProps {
-  history: AttackEntry[];
-  onSelect: (entry: AttackEntry) => void;
+interface CallHistoryProps {
+  history: CallEntry[];
+  onSelect: (entry: CallEntry) => void;
 }
 
-export function AttackHistory({ history, onSelect }: AttackHistoryProps) {
+export function CallHistory({ history, onSelect }: CallHistoryProps) {
   return (
     <div className="glass-card flex flex-col overflow-hidden">
       <div className="border-b border-border/40 px-4 py-3">
         <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Attack History
+          Call History
         </h3>
       </div>
       <div className="max-h-[280px] overflow-y-auto scrollbar-thin">
@@ -21,9 +21,8 @@ export function AttackHistory({ history, onSelect }: AttackHistoryProps) {
             <tr className="border-b border-border/30 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               <th className="px-4 py-2">Time</th>
               <th className="px-4 py-2">Transcript</th>
-              <th className="px-4 py-2">Category</th>
-              <th className="px-4 py-2">Result</th>
-              <th className="px-4 py-2">Conf</th>
+              <th className="px-4 py-2">Verdict</th>
+              <th className="px-4 py-2">Clone Score</th>
             </tr>
           </thead>
           <tbody>
@@ -45,17 +44,6 @@ export function AttackHistory({ history, onSelect }: AttackHistoryProps) {
                   </td>
                   <td className="px-4 py-2.5">
                     <span
-                      className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] font-medium"
-                      style={{
-                        backgroundColor: `${CATEGORY_COLORS[entry.category]}18`,
-                        color: CATEGORY_COLORS[entry.category],
-                      }}
-                    >
-                      {entry.category}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span
                       className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] font-bold"
                       style={{
                         backgroundColor: `${RESULT_COLORS[entry.result]}18`,
@@ -71,13 +59,13 @@ export function AttackHistory({ history, onSelect }: AttackHistoryProps) {
                         <div
                           className="h-full rounded-full"
                           style={{
-                            width: `${entry.confidence * 100}%`,
+                            width: `${entry.cloneScore * 100}%`,
                             backgroundColor: RESULT_COLORS[entry.result],
                           }}
                         />
                       </div>
                       <span className="font-mono text-[10px] text-muted-foreground">
-                        {Math.round(entry.confidence * 100)}%
+                        {Math.round(entry.cloneScore * 100)}%
                       </span>
                     </div>
                   </td>

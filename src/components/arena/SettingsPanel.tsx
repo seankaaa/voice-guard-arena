@@ -4,13 +4,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 
 interface SettingsPanelProps {
-  anthropicKey: string;
-  onAnthropicKeyChange: (key: string) => void;
+  apiKey: string;
+  onApiKeyChange: (key: string) => void;
 }
 
 export function SettingsPanel({
-  anthropicKey,
-  onAnthropicKeyChange,
+  apiKey,
+  onApiKeyChange,
 }: SettingsPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -27,24 +27,21 @@ export function SettingsPanel({
           <div className="flex flex-col gap-3 border-t border-border/40 p-4">
             <label className="flex flex-col gap-1.5">
               <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                Anthropic API Key
+                Detector API Key
               </span>
               <div className="relative">
                 <Input
                   type="password"
-                  value={anthropicKey}
-                  onChange={(e) => onAnthropicKeyChange(e.target.value)}
-                  placeholder="sk-ant-..."
+                  value={apiKey}
+                  onChange={(e) => onApiKeyChange(e.target.value)}
+                  placeholder="Optional — for hosted detectors"
                   className="border-border/40 bg-secondary/50 pr-8 font-mono text-xs"
                 />
-                {anthropicKey && (
+                {apiKey && (
                   <Check className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cyan" />
                 )}
               </div>
             </label>
-            <p className="font-mono text-[10px] text-muted-foreground/60">
-              ElevenLabs is connected via Lovable Cloud — no key needed.
-            </p>
           </div>
         </CollapsibleContent>
       </div>

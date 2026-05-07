@@ -31,13 +31,13 @@ export function WelcomeOverlay({ open, onStart }: WelcomeOverlayProps) {
 
             <div className="space-y-2">
               <h2 className="font-mono text-xl font-bold tracking-tight text-foreground">
-                Voice Safeguard Arena
+                Clone Detection Arena
               </h2>
               <p className="font-body text-sm leading-relaxed text-muted-foreground">
-                Test AI voice safety guardrails in real time.
+                Probe voice clones against a layered detection pipeline.
               </p>
               <p className="font-body text-xs leading-relaxed text-muted-foreground/70">
-                Speak into your mic or use preset attacks to probe the system.
+                Record live or upload an audio clip to score authenticity.
               </p>
             </div>
 
